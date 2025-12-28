@@ -4,7 +4,7 @@ import { loginValidator, registerValidator } from '~/middlewares/users.middlewar
 import { wrapRequestHandler } from '~/utils/handlers.js'
 const usersRouter = Router()
 
-usersRouter.post('/login', loginValidator, loginController)
+usersRouter.post('/login', loginValidator, wrapRequestHandler(loginController))
 
 usersRouter.post('/register', registerValidator, wrapRequestHandler(registerController))
 

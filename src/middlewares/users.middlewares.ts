@@ -1,17 +1,33 @@
 import { Request, Response, NextFunction } from 'express'
 import { checkSchema } from 'express-validator'
-import usersService from '~/services/users.services.js'
+import { USERS_MESSAGES } from '~/constants/messages.js'
+import User from '~/models/schemas/User.schema.js'
+import databaseService from '~/services/database.services.js'
+import { hashPassword } from '~/utils/crypto.js'
 import { validate } from '~/utils/validation.js'
 
-export const loginValidator = (req: Request, res: Response, next: NextFunction) => {
-  const { email, password } = req.body
-  if (!email || !password) {
-    return res.status(400).json({
-      message: 'Missing email or password'
-    })
-  }
-  next()
-}
+export const loginValidator = validate(
+  checkSchema({
+    email: {
+      notEmpty: { errorMessage: USERS_MESSAGES.EMAIL_IS_REQUIRED, bail: true },
+      isEmail: { errorMessage: USERS_MESSAGES.EMAIL_IS_INVALID, bail: true },
+      trim: true,
+      custom: {
+        options: async (value, { req }) => {
+          const user = await databaseService.users.findOne({ email: value, password: hashPassword(req.body.password) })
+          if (!user) throw new Error(USERS_MESSAGES.EMAIL_OR_PASSWORD_INCORRECT)
+          req.user = user as User
+          return true
+        }
+      }
+    },
+
+    password: {
+      notEmpty: { errorMessage: USERS_MESSAGES.PASSWORD_IS_REQUIRED },
+      trim: true
+    }
+  })
+)
 
 export const registerValidator = validate(
   checkSchema({
@@ -27,14 +43,14 @@ export const registerValidator = validate(
 
     email: {
       // bail dùng để dừng lại khi check nếu sai, khi nào pass các điều kiện kia thì mới xuống dưới để tránh query tài nguyên trong DB
-      notEmpty: { errorMessage: 'Email is required.', bail: true },
-      isEmail: { errorMessage: 'Email is not valid.', bail: true },
+      notEmpty: { errorMessage: USERS_MESSAGES.EMAIL_IS_REQUIRED, bail: true },
+      isEmail: { errorMessage: USERS_MESSAGES.EMAIL_IS_INVALID, bail: true },
       trim: true,
       custom: {
-        options: async (value) => {
-          const isEmailExist = await usersService.checkEmailExist(value) // tránh query cái này
-          if (isEmailExist) {
-            throw 'Email is already existed'
+        options: async (value, { req }) => {
+          const user = await databaseService.users.findOne({ email: value }) // tránh query cái này
+          if (user) {
+            throw new Error(USERS_MESSAGES.EMAIL_ALREADY_EXISTS)
           }
           return true
         }
@@ -42,11 +58,11 @@ export const registerValidator = validate(
     },
 
     password: {
-      notEmpty: { errorMessage: 'Password is required.' },
+      notEmpty: { errorMessage: USERS_MESSAGES.PASSWORD_IS_REQUIRED },
       isString: true,
       isLength: {
         options: { min: 6, max: 50 },
-        errorMessage: 'Password must be between 6 and 50 characters.'
+        errorMessage: USERS_MESSAGES.PASSWORD_LENGTH
       },
       isStrongPassword: {
         options: {
@@ -55,13 +71,12 @@ export const registerValidator = validate(
           minUppercase: 1,
           minSymbols: 1
         },
-        errorMessage:
-          'Password must be at least 6 characters long and include at least 1 lowercase letter, 1 uppercase letter, and 1 symbol.'
+        errorMessage: USERS_MESSAGES.PASSWORD_STRONG
       }
     },
 
     confirm_password: {
-      notEmpty: { errorMessage: 'Confirm password is required.' },
+      notEmpty: { errorMessage: USERS_MESSAGES.CONFIRM_PASSWORD_IS_REQUIRED },
       isString: true,
       isLength: {
         options: { min: 6, max: 50 }
@@ -79,7 +94,7 @@ export const registerValidator = validate(
           if (value === req.body.password) {
             return true
           }
-          throw 'Confirm password does not match password.'
+          throw USERS_MESSAGES.CONFIRM_PASSWORD_NOT_MATCH
         }
       }
     },
@@ -87,7 +102,7 @@ export const registerValidator = validate(
     date_of_birth: {
       isISO8601: {
         options: { strict: true, strictSeparator: true },
-        errorMessage: 'Date of birth must be a valid ISO8601 date (e.g., 2000-12-31).'
+        errorMessage: USERS_MESSAGES.DATE_OF_BIRTH_ISO8601
       }
     }
   })
