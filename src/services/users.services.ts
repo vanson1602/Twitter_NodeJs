@@ -3,11 +3,12 @@ import databaseService from './database.services.js'
 import { RegisterRequestBody } from '~/models/requests/Users.requests.js'
 import { hashPassword } from '~/utils/crypto.js'
 import { signToken } from '~/utils/jwt.js'
-import { tokenType } from '~/constants/enums.js'
+import { tokenType, UserVerifyStatus } from '~/constants/enums.js'
 import type { StringValue } from 'ms'
 import RefreshToken from '~/models/schemas/RefreshToken.schema.js'
 import { ObjectId } from 'mongodb'
 import { config } from 'dotenv'
+import { USERS_MESSAGES } from '~/constants/messages.js'
 config()
 class UsersService {
   private signAccessToken(user_id: string) {
@@ -16,6 +17,7 @@ class UsersService {
         user_id,
         token_type: tokenType.AccessToken
       },
+      privateKey: process.env.JWT_SECRET_ACCESS_TOKEN as string,
       options: {
         expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN as StringValue
       }
@@ -28,8 +30,22 @@ class UsersService {
         user_id,
         token_type: tokenType.RefreshToken
       },
+      privateKey: process.env.JWT_SECRET_REFRESH_TOKEN as string,
       options: {
         expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN as StringValue
+      }
+    })
+  }
+
+  private signEmailVerifyToken(user_id: string) {
+    return signToken({
+      payload: {
+        user_id,
+        token_type: tokenType.EmailVerifyToken
+      },
+      privateKey: process.env.JWT_SECRET_EMAIL_VERIFY_TOKEN as string,
+      options: {
+        expiresIn: process.env.EMAIL_TOKEN_EXPIRES_IN as StringValue
       }
     })
   }
@@ -39,21 +55,26 @@ class UsersService {
   }
 
   async register(payload: RegisterRequestBody) {
-    const result = await databaseService.users.insertOne(
+    const user_id = new ObjectId()
+    const email_verify_token = await this.signEmailVerifyToken(user_id.toString())
+    await databaseService.users.insertOne(
       new User({
         ...payload,
+        _id: user_id,
         date_of_birth: new Date(payload.date_of_birth),
-        password: hashPassword(payload.password)
+        password: hashPassword(payload.password),
+        email_verify_token: email_verify_token
       })
     )
-    const user_id = result.insertedId.toString()
-    const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id)
+    const [access_token, refresh_token] = await this.signAccessAndRefreshToken(user_id.toString())
     await databaseService.refreshToken.insertOne(
       new RefreshToken({ user_id: new ObjectId(user_id), token: refresh_token })
     )
+    console.log('email_verify_token: ', email_verify_token)
     return {
       access_token,
-      refresh_token
+      refresh_token,
+      email_verify_token
     }
   }
 
@@ -70,6 +91,59 @@ class UsersService {
     return {
       access_token,
       refresh_token
+    }
+  }
+
+  async logout(refresh_token: string) {
+    await databaseService.refreshToken.deleteOne({ token: refresh_token })
+    return {
+      message: USERS_MESSAGES.LOGOUT_SUCCESSFULLY
+    }
+  }
+
+  async verifyEmail(user_id: string) {
+    const [token] = await Promise.all([
+      this.signAccessAndRefreshToken(user_id),
+      databaseService.users.updateOne({ _id: new ObjectId(user_id) }, [
+        {
+          $set: {
+            email_verify_token: '',
+            updated_at: '$$NOW',
+            verify: UserVerifyStatus.Verified
+          }
+        }
+      ])
+    ])
+
+    const [access_token, refresh_token] = token
+    console.log('access_token: ', access_token)
+    console.log('refresh_token: ', refresh_token)
+
+    return {
+      access_token,
+      refresh_token
+    }
+  }
+
+  async resendVerifyEmail(user_id: string) {
+    const resend_email_verify_token = await this.signEmailVerifyToken(user_id)
+    await databaseService.users.updateOne(
+      {
+        _id: new ObjectId(user_id)
+      },
+
+      {
+        $set: {
+          email_verify_token: resend_email_verify_token
+        },
+        $currentDate: {
+          updated_at: true
+        }
+      }
+    )
+    return {
+      message: USERS_MESSAGES.RESEND_EMAIL_VERIFY_SUCCESS,
+      resend_email_verify_token
     }
   }
 }

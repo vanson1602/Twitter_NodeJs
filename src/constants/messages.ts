@@ -21,5 +21,21 @@ export const USERS_MESSAGES = {
 
   DATE_OF_BIRTH_ISO8601: 'Date of birth must be a valid ISO8601 date (e.g., 2000-12-31).',
 
-  USER_NOT_FOUND: 'User not found'
+  USER_NOT_FOUND: 'User not found',
+
+  ACCESS_TOKEN_IS_INVALID: 'Access token is invalid',
+  ACCESS_TOKEN_IS_REQUIRED: 'Access token is required',
+
+  REFRESH_TOKEN_IS_REQUIRED: 'Refresh token is required',
+  REFRESH_TOKEN_IS_STRING: 'Refresh token must be a string',
+  REFRESH_TOKEN_IS_INVALID: 'Refresh token is invalid',
+  USED_REFRESH_TOKEN_OR_NOT_EXIST: 'Used refresh token or not exist',
+
+  LOGOUT_SUCCESSFULLY: 'Logout successfully',
+  EMAIL_VERIFY_TOKEN_IS_REQUIRED: 'Email verify token is required',
+  EMAIL_ALREADY_VERIFIED_BEFORE: 'Email already verified before',
+  EMAIL_VERIFY_SUCCESS: 'Email verify successfully',
+  EMAIL_VERIFY_TOKEN_IS_INVALID: 'Email verify token is invalid',
+  RESEND_EMAIL_VERIFY_SUCCESS: 'Resend email verify success',
+  USER_HAVE_TO_VERIFY_EMAIL: 'User have to verify email before login'
 } as const
