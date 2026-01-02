@@ -1,6 +1,6 @@
 import User from '~/models/schemas/User.schema.js'
 import databaseService from './database.services.js'
-import { RegisterRequestBody } from '~/models/requests/Users.requests.js'
+import { RegisterRequestBody, resetPasswordRequestBody } from '~/models/requests/Users.requests.js'
 import { hashPassword } from '~/utils/crypto.js'
 import { signToken } from '~/utils/jwt.js'
 import { tokenType, UserVerifyStatus } from '~/constants/enums.js'
@@ -50,6 +50,19 @@ class UsersService {
     })
   }
 
+  private signForgotPasswordToken(user_id: string) {
+    return signToken({
+      payload: {
+        user_id,
+        token_type: tokenType.ForgotPasswordToken
+      },
+      privateKey: process.env.JWT_SECRET_FORGOT_PASSWORD_TOKEN as string,
+      options: {
+        expiresIn: process.env.FORGOT_PASSWORD_TOKEN_EXPIRES_IN as StringValue
+      }
+    })
+  }
+
   private signAccessAndRefreshToken(user_id: string) {
     return Promise.all([this.signAccessToken(user_id), this.signRefreshToken(user_id)])
   }
@@ -70,7 +83,6 @@ class UsersService {
     await databaseService.refreshToken.insertOne(
       new RefreshToken({ user_id: new ObjectId(user_id), token: refresh_token })
     )
-    console.log('email_verify_token: ', email_verify_token)
     return {
       access_token,
       refresh_token,
@@ -116,8 +128,6 @@ class UsersService {
     ])
 
     const [access_token, refresh_token] = token
-    console.log('access_token: ', access_token)
-    console.log('refresh_token: ', refresh_token)
 
     return {
       access_token,
@@ -145,6 +155,62 @@ class UsersService {
       message: USERS_MESSAGES.RESEND_EMAIL_VERIFY_SUCCESS,
       resend_email_verify_token
     }
+  }
+
+  async forgotPassword(user_id: string) {
+    const forgot_password_token = await this.signForgotPasswordToken(user_id)
+    await databaseService.users.updateOne(
+      {
+        _id: new ObjectId(user_id)
+      },
+      [
+        {
+          $set: {
+            forgot_password_token,
+            updated_at: '$$NOW'
+          }
+        }
+      ]
+    )
+    // gửi email kèm link đường dẫn email đến người dùng https://twitter/forgot-password?token=token
+    return {
+      message: USERS_MESSAGES.CHECK_EMAIL_TO_RESET_PASSWORD,
+      forgot_password_token
+    }
+  }
+
+  async resetPassword(user_id: string, password: string) {
+    await databaseService.users.updateOne(
+      {
+        _id: new ObjectId(user_id)
+      },
+      [
+        {
+          $set: {
+            password: hashPassword(password),
+            forgot_password_token: '',
+            updated_at: '$$NOW'
+          }
+        }
+      ]
+    )
+    return {
+      message: USERS_MESSAGES.RESET_PASSWORD_SUCCESS
+    }
+  }
+
+  async getMe(user_id: string) {
+    const user = await databaseService.users.findOne(
+      { _id: new ObjectId(user_id) },
+      {
+        projection: {
+          password: 0,
+          email_verify_token: 0,
+          forgot_password_token: 0
+        }
+      }
+    )
+    return user
   }
 }
 
