@@ -8,6 +8,7 @@ import {
   RegisterRequestBody,
   resetPasswordRequestBody,
   tokenPayload,
+  UpdateMeRequestBody,
   verifyEmailRequestBody
 } from '~/models/requests/Users.requests.js'
 import User from '~/models/schemas/User.schema.js'
@@ -16,11 +17,12 @@ import databaseService from '~/services/database.services.js'
 import HTTP_STATUS from '~/constants/httpStatus.js'
 import { USERS_MESSAGES } from '~/constants/messages.js'
 import { UserVerifyStatus } from '~/constants/enums.js'
+import { pick } from 'lodash'
 
 export const loginController = async (req: Request<ParamsDictionary, any, LoginRequestBody>, res: Response) => {
   const user = req.user as User
   const user_id = user._id as ObjectId
-  const result = await usersService.login(user_id.toString())
+  const result = await usersService.login({ user_id: user_id.toString(), verify: user.verify })
   return res.json({
     message: 'Login success',
     result
@@ -93,8 +95,8 @@ export const forgotPasswordController = async (
   req: Request<ParamsDictionary, any, ForgotPasswordRequestBody>,
   res: Response
 ) => {
-  const { _id } = req.user as User
-  const result = await usersService.forgotPassword((_id as ObjectId).toString())
+  const { _id, verify } = req.user as User
+  const result = await usersService.forgotPassword({ user_id: (_id as ObjectId).toString(), verify })
   return res.status(HTTP_STATUS.OK).json(result)
 }
 
@@ -122,6 +124,16 @@ export const getMeController = async (req: Request, res: Response) => {
   const result = await usersService.getMe(user_id)
   return res.status(HTTP_STATUS.OK).json({
     message: USERS_MESSAGES.GET_ME_SUCCESS,
+    data: result
+  })
+}
+
+export const updateMeController = async (req: Request<ParamsDictionary, any, UpdateMeRequestBody>, res: Response) => {
+  const { user_id } = req.decode_authorization as tokenPayload
+  const { body } = req
+  const result = await usersService.updateMe(user_id, body)
+  return res.status(HTTP_STATUS.OK).json({
+    message: USERS_MESSAGES.UPDATE_ME_SUCCESS,
     data: result
   })
 }

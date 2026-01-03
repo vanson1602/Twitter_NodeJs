@@ -45,5 +45,7 @@ export const USERS_MESSAGES = {
   FORGOT_PASSWORD_TOKEN_IS_INVALID: 'Forgot password token is invalid',
   RESET_PASSWORD_SUCCESS: 'Reset password successfully',
 
-  GET_ME_SUCCESS: 'get my profile success'
+  GET_ME_SUCCESS: 'get my profile success',
+  USER_NOT_VERIFIED: 'User not verify',
+  UPDATE_ME_SUCCESS: 'Update me successfully'
 } as const

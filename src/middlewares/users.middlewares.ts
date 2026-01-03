@@ -1,5 +1,5 @@
 import { checkSchema, ParamSchema } from 'express-validator'
-import { Request } from 'express'
+import { NextFunction, Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 const { JsonWebTokenError } = jwt
 import HTTP_STATUS from '~/constants/httpStatus.js'
@@ -13,6 +13,7 @@ import { validate } from '~/utils/validation.js'
 import { config } from 'dotenv'
 import { UserVerifyStatus } from '~/constants/enums.js'
 import { ObjectId } from 'mongodb'
+import { tokenPayload } from '~/models/requests/Users.requests.js'
 config()
 
 const password_schema: ParamSchema = {
@@ -101,6 +102,38 @@ const forgot_password_token_schema: ParamSchema = {
   }
 }
 
+const name_schema: ParamSchema = {
+  notEmpty: { errorMessage: 'Name is required.' },
+  isString: { errorMessage: 'Name must be a string.' },
+  isLength: {
+    options: { min: 1, max: 100 },
+    errorMessage: 'Name must be between 1 and 100 characters.'
+  },
+  trim: true
+}
+
+const date_of_birth_schema: ParamSchema = {
+  isISO8601: {
+    options: { strict: true, strictSeparator: true },
+    errorMessage: USERS_MESSAGES.DATE_OF_BIRTH_ISO8601
+  }
+}
+
+const image_schema: ParamSchema = {
+  optional: true,
+  isString: {
+    errorMessage: 'Image must be string'
+  },
+  trim: true,
+  isLength: {
+    options: {
+      min: 1,
+      max: 400
+    },
+    errorMessage: 'Image length must be from 1 to 400'
+  }
+}
+
 export const loginValidator = validate(
   checkSchema(
     {
@@ -139,15 +172,7 @@ export const loginValidator = validate(
 export const registerValidator = validate(
   checkSchema(
     {
-      name: {
-        notEmpty: { errorMessage: 'Name is required.' },
-        isString: { errorMessage: 'Name must be a string.' },
-        isLength: {
-          options: { min: 1, max: 100 },
-          errorMessage: 'Name must be between 1 and 100 characters.'
-        },
-        trim: true
-      },
+      name: name_schema,
 
       email: {
         // bail dùng để dừng lại khi check nếu sai, khi nào pass các điều kiện kia thì mới xuống dưới để tránh query tài nguyên trong DB
@@ -169,12 +194,7 @@ export const registerValidator = validate(
 
       confirm_password: confirm_password_schema,
 
-      date_of_birth: {
-        isISO8601: {
-          options: { strict: true, strictSeparator: true },
-          errorMessage: USERS_MESSAGES.DATE_OF_BIRTH_ISO8601
-        }
-      }
+      date_of_birth: date_of_birth_schema
     },
     ['body']
   )
@@ -343,6 +363,99 @@ export const resetPasswordValidator = validate(
       password: password_schema,
       confirm_password: confirm_password_schema,
       forgot_password_token: forgot_password_token_schema
+    },
+    ['body']
+  )
+)
+
+export const verifiedUserValidator = (req: Request, res: Response, next: NextFunction) => {
+  const { verify } = req.decode_authorization as tokenPayload
+  if (verify !== UserVerifyStatus.Verified) {
+    throw new ErrorWithStatus({
+      message: USERS_MESSAGES.USER_NOT_VERIFIED,
+      status: HTTP_STATUS.FORBIDDEN
+    })
+  }
+  next()
+}
+
+export const updateMeValidator = validate(
+  checkSchema(
+    {
+      name: {
+        ...name_schema,
+        optional: true,
+        notEmpty: undefined
+      },
+
+      date_of_birth: {
+        ...date_of_birth_schema,
+        optional: true
+      },
+
+      bio: {
+        optional: true,
+        isString: {
+          errorMessage: 'Bio must be string'
+        },
+        trim: true,
+        isLength: {
+          options: {
+            min: 1,
+            max: 200
+          },
+          errorMessage: 'Bio length must be from 1 to 200'
+        }
+      },
+
+      location: {
+        optional: true,
+        isString: {
+          errorMessage: 'Location must be string'
+        },
+        trim: true,
+        isLength: {
+          options: {
+            min: 1,
+            max: 200
+          },
+          errorMessage: 'Location length must be from 1 to 200'
+        }
+      },
+
+      website: {
+        optional: true,
+        isString: {
+          errorMessage: 'Website must be string'
+        },
+        trim: true,
+        isLength: {
+          options: {
+            min: 1,
+            max: 200
+          },
+          errorMessage: 'Website length must be from 1 to 200'
+        }
+      },
+
+      username: {
+        optional: true,
+        isString: {
+          errorMessage: 'Username must be string'
+        },
+        trim: true,
+        isLength: {
+          options: {
+            min: 1,
+            max: 50
+          },
+          errorMessage: 'Username length must be from 1 to 50'
+        }
+      },
+
+      avatar: image_schema,
+
+      cover_photo: image_schema
     },
     ['body']
   )
