@@ -2,12 +2,15 @@ import { NextFunction, Request, Response } from 'express'
 import usersService from '~/services/users.services.js'
 import { ParamsDictionary } from 'express-serve-static-core'
 import {
+  changePasswordRequestBody,
+  FollowRequestBody,
   ForgotPasswordRequestBody,
   LoginRequestBody,
   LogoutRequestBody,
   RegisterRequestBody,
   resetPasswordRequestBody,
   tokenPayload,
+  UnFollowRequestParams,
   UpdateMeRequestBody,
   verifyEmailRequestBody
 } from '~/models/requests/Users.requests.js'
@@ -17,7 +20,6 @@ import databaseService from '~/services/database.services.js'
 import HTTP_STATUS from '~/constants/httpStatus.js'
 import { USERS_MESSAGES } from '~/constants/messages.js'
 import { UserVerifyStatus } from '~/constants/enums.js'
-import { pick } from 'lodash'
 
 export const loginController = async (req: Request<ParamsDictionary, any, LoginRequestBody>, res: Response) => {
   const user = req.user as User
@@ -136,4 +138,37 @@ export const updateMeController = async (req: Request<ParamsDictionary, any, Upd
     message: USERS_MESSAGES.UPDATE_ME_SUCCESS,
     data: result
   })
+}
+
+export const getUserProfileController = async (req: Request, res: Response) => {
+  const { username } = req.params
+  const result = await usersService.getUserProfile(username)
+  return res.status(HTTP_STATUS.OK).json({
+    message: USERS_MESSAGES.GET_PROFILE_USER_SUCCESS,
+    data: result
+  })
+}
+
+export const followController = async (req: Request<ParamsDictionary, any, FollowRequestBody>, res: Response) => {
+  const { user_id } = req.decode_authorization as tokenPayload
+  const { followed_user_id } = req.body
+  const result = await usersService.follow(user_id, followed_user_id)
+  return res.status(HTTP_STATUS.OK).json(result)
+}
+
+export const unFollowController = async (req: Request, res: Response) => {
+  const { user_id } = req.decode_authorization as tokenPayload
+  const { user_id: followed_user_id } = req.params
+  const result = await usersService.unFollow(user_id, followed_user_id)
+  return res.status(HTTP_STATUS.OK).json(result)
+}
+
+export const changePasswordController = async (
+  req: Request<ParamsDictionary, any, changePasswordRequestBody>,
+  res: Response
+) => {
+  const { user_id } = req.decode_authorization as tokenPayload
+  const { new_password } = req.body
+  const result = await usersService.changePassword(user_id, new_password)
+  return res.status(HTTP_STATUS.OK).json(result)
 }

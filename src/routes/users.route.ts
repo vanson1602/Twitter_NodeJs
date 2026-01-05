@@ -1,12 +1,16 @@
 import { Router } from 'express'
 import {
+  changePasswordController,
+  followController,
   forgotPasswordController,
   getMeController,
+  getUserProfileController,
   loginController,
   logoutController,
   registerController,
   resendVerifyEmailController,
   resetPasswordController,
+  unFollowController,
   updateMeController,
   verifyEmailController,
   verifyForgotPasswordController
@@ -14,12 +18,15 @@ import {
 import { filterMiddleWares } from '~/middlewares/common.middlewares.js'
 import {
   accessTokenValidator,
+  changePasswordValidator,
   emailVerifyTokenValidator,
+  followValidator,
   forgotPasswordValidator,
   loginValidator,
   refreshTokenValidator,
   registerValidator,
   resetPasswordValidator,
+  unFollowValidator,
   updateMeValidator,
   verifiedUserValidator,
   verifyForgotPasswordTokenValidator
@@ -129,6 +136,57 @@ usersRouter.patch(
     'website'
   ]),
   wrapRequestHandler(updateMeController)
+)
+
+/*
+ * description: get user profile
+ * path: /:username
+ * method: GET
+ */
+usersRouter.get('/:username', wrapRequestHandler(getUserProfileController))
+
+/*
+ * description: follow some user
+ * path: /follow
+ * method: POST
+ * header: {Authorization: Bearer <access_token>}
+ * body: { followed_user_id }
+ */
+usersRouter.post(
+  '/follow',
+  accessTokenValidator,
+  verifiedUserValidator,
+  followValidator,
+  wrapRequestHandler(followController)
+)
+
+/*
+ * description: un follow some user
+ * path:   '/follow/:user_id',
+ * method: DELETE
+ * header: {Authorization: Bearer <access_token>}
+ */
+usersRouter.delete(
+  '/follow/:user_id',
+  accessTokenValidator,
+  verifiedUserValidator,
+  unFollowValidator,
+  wrapRequestHandler(unFollowController)
+)
+
+/*
+ * description: change password
+ * path:   '/follow/:user_id',
+ * method: PUT
+ * header: {Authorization: Bearer <access_token>}
+ * body { old_password, new_password, confirm_new_password}
+ */
+usersRouter.put(
+  '/change-password',
+  accessTokenValidator,
+  verifiedUserValidator,
+  changePasswordValidator,
+  wrapRequestHandler(changePasswordController)
 )
 
 export default usersRouter

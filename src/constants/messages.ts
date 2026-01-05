@@ -47,5 +47,19 @@ export const USERS_MESSAGES = {
 
   GET_ME_SUCCESS: 'get my profile success',
   USER_NOT_VERIFIED: 'User not verify',
-  UPDATE_ME_SUCCESS: 'Update me successfully'
+  UPDATE_ME_SUCCESS: 'Update me successfully',
+  GET_PROFILE_USER_SUCCESS: 'Get profile user success',
+
+  FOLLOW_SUCCESS: 'Follow success',
+  INVALID_FOLLOWED_USER_ID: 'Invalid follower user_id',
+  ALREADY_FOLLOW_USER: 'You already follow this user',
+  UN_FOLLOW_SUCCESS: 'Unfollow success',
+  HAVE_NOT_FOLLOWED: 'You have not followed this user yet.',
+  INVALID_USER_ID: 'Invalid user_id',
+  ALREADY_UN_FOLLOW: 'Already un follow user',
+  USER_NAME_INVALID:
+    'Username must be 4-15 characters long and contain only letters, numbers, underscores and not only numbers',
+  USERNAME_EXISTED: 'Username existed',
+  OLD_PASSWORD_NOT_MATCH: 'Old password not match',
+  CHANGE_PASSWORD_SUCCESS: 'Change password success'
 } as const

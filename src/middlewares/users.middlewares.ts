@@ -14,6 +14,7 @@ import { config } from 'dotenv'
 import { UserVerifyStatus } from '~/constants/enums.js'
 import { ObjectId } from 'mongodb'
 import { tokenPayload } from '~/models/requests/Users.requests.js'
+import { REGEX_USERNAME } from '~/constants/regex.js'
 config()
 
 const password_schema: ParamSchema = {
@@ -134,6 +135,28 @@ const image_schema: ParamSchema = {
   }
 }
 
+const user_id_schema: ParamSchema = {
+  custom: {
+    options: async (value) => {
+      if (!ObjectId.isValid(value)) {
+        throw new ErrorWithStatus({
+          message: USERS_MESSAGES.INVALID_USER_ID,
+          status: HTTP_STATUS.NOT_FOUND
+        })
+      }
+      const followed_user = await databaseService.users.findOne({
+        _id: new ObjectId(value)
+      })
+      if (!followed_user) {
+        throw new ErrorWithStatus({
+          message: USERS_MESSAGES.USER_NOT_FOUND,
+          status: HTTP_STATUS.NOT_FOUND
+        })
+      }
+    }
+  }
+}
+
 export const loginValidator = validate(
   checkSchema(
     {
@@ -147,7 +170,9 @@ export const loginValidator = validate(
               email: value,
               password: hashPassword(req.body.password)
             })
-            if (!user) throw new Error(USERS_MESSAGES.EMAIL_OR_PASSWORD_INCORRECT)
+            if (!user) {
+              throw new Error(USERS_MESSAGES.EMAIL_OR_PASSWORD_INCORRECT)
+            }
             if (user.verify === UserVerifyStatus.Unverified) {
               throw new ErrorWithStatus({
                 message: USERS_MESSAGES.USER_HAVE_TO_VERIFY_EMAIL,
@@ -444,12 +469,16 @@ export const updateMeValidator = validate(
           errorMessage: 'Username must be string'
         },
         trim: true,
-        isLength: {
-          options: {
-            min: 1,
-            max: 50
-          },
-          errorMessage: 'Username length must be from 1 to 50'
+        custom: {
+          options: async (value: string, { req }) => {
+            if (!REGEX_USERNAME.test(value)) {
+              throw Error(USERS_MESSAGES.USER_NAME_INVALID)
+            }
+            const user = await databaseService.users.findOne({ username: value })
+            if (user) {
+              throw Error(USERS_MESSAGES.USERNAME_EXISTED)
+            }
+          }
         }
       },
 
@@ -459,4 +488,52 @@ export const updateMeValidator = validate(
     },
     ['body']
   )
+)
+
+export const followValidator = validate(
+  checkSchema(
+    {
+      followed_user_id: user_id_schema
+    },
+    ['body']
+  )
+)
+
+export const unFollowValidator = validate(
+  checkSchema(
+    {
+      user_id: user_id_schema
+    },
+    ['params']
+  )
+)
+
+export const changePasswordValidator = validate(
+  checkSchema({
+    old_password: {
+      ...password_schema,
+      custom: {
+        options: async (values, { req }) => {
+          const { user_id } = (req as Request).decode_authorization as tokenPayload
+          const user = await databaseService.users.findOne({ _id: new ObjectId(user_id) })
+          if (!user) {
+            throw new ErrorWithStatus({
+              message: USERS_MESSAGES.USER_NOT_FOUND,
+              status: HTTP_STATUS.NOT_FOUND
+            })
+          }
+          const { password } = user
+          const isMatch = hashPassword(values) === password
+          if (!isMatch) {
+            throw new ErrorWithStatus({
+              message: USERS_MESSAGES.OLD_PASSWORD_NOT_MATCH,
+              status: HTTP_STATUS.UNAUTHORIZED
+            })
+          }
+        }
+      }
+    },
+    password: password_schema,
+    confirm_password: confirm_password_schema
+  })
 )
